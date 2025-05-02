@@ -29,7 +29,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { io } from 'socket.io-client';
 
 const props = defineProps({
@@ -43,14 +43,14 @@ const props = defineProps({
   }
 });
 
+const emit = defineEmits(['socket-ready', 'user-joined', 'user-left', 'new-message', 'chat-history']);
+
 const socket = ref(null);
 const cursors = ref({});
 const colors = ['#FF5733', '#33FF57', '#3357FF', '#F033FF', '#FF33A8'];
 const userColor = colors[Math.floor(Math.random() * colors.length)];
-const connectionAttempts = ref(0);
-const maxConnectionAttempts = 5;
+const isConnected = ref(false);
 
-// Function to initialize socket connection
 const initializeSocket = () => {
   try {
     // Connect to the standalone Socket.io server
@@ -60,9 +60,10 @@ const initializeSocket = () => {
       transports: ['websocket', 'polling']
     });
     
-    // Connection event handlers
+    // Handle connection events
     socket.value.on('connect', () => {
-      console.log('Connected to Socket.io server');
+      console.log('Socket connected:', socket.value.id);
+      isConnected.value = true;
       
       // Join room
       socket.value.emit('join-room', {
@@ -70,20 +71,44 @@ const initializeSocket = () => {
         username: props.username,
         color: userColor
       });
-    });
-    
-    socket.value.on('connect_error', (error) => {
-      console.error('Socket.io connection error:', error);
-      connectionAttempts.value++;
       
-      if (connectionAttempts.value < maxConnectionAttempts) {
-        console.log(`Retrying connection (${connectionAttempts.value}/${maxConnectionAttempts})...`);
-      }
+      // Emit socket-ready event to parent component
+      emit('socket-ready', socket.value);
     });
     
     // Listen for cursor updates
     socket.value.on('cursor-update', (data) => {
       cursors.value = data.cursors;
+    });
+    
+    // Listen for user joined events
+    socket.value.on('user-joined', (data) => {
+      emit('user-joined', data);
+    });
+    
+    // Listen for user left events
+    socket.value.on('user-left', (data) => {
+      emit('user-left', data);
+    });
+    
+    // Listen for new messages
+    socket.value.on('new-message', (data) => {
+      emit('new-message', data);
+    });
+    
+    // Listen for chat history
+    socket.value.on('chat-history', (data) => {
+      emit('chat-history', data);
+    });
+    
+    socket.value.on('disconnect', () => {
+      console.log('Socket disconnected');
+      isConnected.value = false;
+    });
+    
+    socket.value.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      isConnected.value = false;
     });
   } catch (error) {
     console.error('Error initializing Socket.io:', error);
@@ -91,7 +116,6 @@ const initializeSocket = () => {
 };
 
 onMounted(() => {
-  // Initialize socket connection
   initializeSocket();
   
   // Track mouse movement
@@ -105,8 +129,32 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove);
 });
 
+// Watch for roomId changes to rejoin the room
+watch(() => props.roomId, (newRoomId, oldRoomId) => {
+  if (socket.value && isConnected.value && newRoomId !== oldRoomId) {
+    // Join new room
+    socket.value.emit('join-room', {
+      roomId: newRoomId,
+      username: props.username,
+      color: userColor
+    });
+  }
+});
+
+// Watch for username changes
+watch(() => props.username, (newUsername, oldUsername) => {
+  if (socket.value && isConnected.value && newUsername !== oldUsername) {
+    // Rejoin room with new username
+    socket.value.emit('join-room', {
+      roomId: props.roomId,
+      username: newUsername,
+      color: userColor
+    });
+  }
+});
+
 const handleMouseMove = (e) => {
-  if (socket.value && socket.value.connected) {
+  if (socket.value && isConnected.value) {
     socket.value.emit('cursor-move', {
       roomId: props.roomId,
       x: e.clientX,
@@ -114,4 +162,9 @@ const handleMouseMove = (e) => {
     });
   }
 };
+
+// Expose socket to parent component
+defineExpose({
+  socket
+});
 </script>
