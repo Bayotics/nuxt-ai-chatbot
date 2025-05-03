@@ -7,7 +7,7 @@
         
         <div class="flex items-center space-x-2">
           <button 
-            v-if="auth.isAuthenticated"
+            v-if="auth.isAuthenticated.value"
             @click="showCreateRoomModal = true" 
             class="px-4 py-2 bg-primary-600 text-gray-400 rounded-md hover:bg-primary-700 transition-colors"
           >
@@ -18,7 +18,7 @@
             @click="showAuthModal = !showAuthModal" 
             class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
           >
-            {{ auth.isAuthenticated ? 'Account' : 'Sign In' }}
+            {{ auth.isAuthenticated.value ? 'Account' : 'Sign In' }}
           </button>
         </div>
       </div>
@@ -194,6 +194,9 @@ import { io } from 'socket.io-client';
 
 // Use auth composable
 const auth = useAuth();
+console.log(auth)
+console.log(auth.isAuthenticated)
+console.log(auth.isAuthenticated.value)
 
 const username = ref('User' + Math.floor(Math.random() * 1000));
 const roomId = ref('');

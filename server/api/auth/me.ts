@@ -1,27 +1,52 @@
-import { defineEventHandler, createError } from 'h3';
+import jwt from 'jsonwebtoken';
 import { connectToDatabase } from '~/server/utils/mongodb';
 import { User } from '~/server/models/User';
-import { getUserFromEvent } from '~/server/utils/auth';
+import { defineEventHandler, getHeader, createError } from 'h3';
 
 export default defineEventHandler(async (event) => {
   try {
-    await connectToDatabase();
+    // Get authorization header
+    const authHeader = getHeader(event, 'authorization');
     
-    // Get user ID from token
-    const userId = getUserFromEvent(event);
-    
-    if (!userId) {
-      throw createError({
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return createError({
         statusCode: 401,
-        message: 'Unauthorized'
+        message: 'Unauthorized: No token provided'
       });
     }
     
-    // Find user by ID
-    const user = await User.findById(userId).select('-password');
+    // Extract token
+    const token = authHeader.split(' ')[1];
+    
+    if (!token) {
+      return createError({
+        statusCode: 401,
+        message: 'Unauthorized: Invalid token format'
+      });
+    }
+    
+    // Verify token
+    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (error) {
+      console.error('Token verification error:', error);
+      return createError({
+        statusCode: 401,
+        message: 'Unauthorized: Invalid token'
+      });
+    }
+    
+    // Connect to database
+    await connectToDatabase();
+    
+    // Find user
+    const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {
-      throw createError({
+      return createError({
         statusCode: 404,
         message: 'User not found'
       });
@@ -40,10 +65,10 @@ export default defineEventHandler(async (event) => {
       }
     };
   } catch (error) {
-    console.error('Get user error:', error);
-    throw createError({
-      statusCode: error.statusCode || 500,
-      message: error.message || 'Failed to get user'
+    console.error('Error in /api/auth/me:', error);
+    return createError({
+      statusCode: 500,
+      message: 'Server error: ' + (error.message || 'Unknown error')
     });
   }
 });

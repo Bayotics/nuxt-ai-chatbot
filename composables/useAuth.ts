@@ -19,7 +19,7 @@ const isLoading = ref(false);
 const error = ref<string | null>(null);
 
 // Initialize auth from localStorage
-    const initAuth = () => {
+const initAuth = () => {
   if (process.client) {
     const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('auth_user');
@@ -141,7 +141,10 @@ const logout = () => {
 
 // Get current user
 const fetchCurrentUser = async () => {
-  if (!token.value) return null;
+  if (!token.value) {
+    isLoading.value = false;
+    return null;
+  }
   
   isLoading.value = true;
   error.value = null;
