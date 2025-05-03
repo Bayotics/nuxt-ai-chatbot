@@ -1,6 +1,11 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import mongoose from 'mongoose';
+import * as dotenv from 'dotenv';
 
+
+
+dotenv.config();
 // Create HTTP server
 const httpServer = createServer();
 
@@ -12,8 +17,40 @@ const io = new Server(httpServer, {
   }
 });
 
-// Store rooms data
-const rooms = {};
+// Connect to MongoDB
+const connectToMongoDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('Connected to MongoDB from Socket.io server');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+  }
+};
+
+// Define Room schema for Socket.io server
+const roomSchema = new mongoose.Schema({
+  name: String,
+  description: String,
+  createdBy: String,
+  creatorName: String,
+  isPrivate: Boolean,
+  password: String,
+  members: [{
+    userId: String,
+    username: String,
+    role: String
+  }],
+  imageUrl: String,
+  color: String
+}, {
+  timestamps: true
+});
+
+// Create Room model
+const Room = mongoose.models.Room || mongoose.model('Room', roomSchema);
+
+// Store chat rooms data
+const chatRooms = {};
 
 // Socket.io connection handler
 io.on('connection', (socket) => {
@@ -24,8 +61,8 @@ io.on('connection', (socket) => {
     const { roomId, username, color } = data;
     
     // Create room if it doesn't exist
-    if (!rooms[roomId]) {
-      rooms[roomId] = {
+    if (!chatRooms[roomId]) {
+      chatRooms[roomId] = {
         cursors: {},
         messages: [] // Add messages array to store chat history
       };
@@ -35,7 +72,7 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     
     // Add cursor to room
-    rooms[roomId].cursors[socket.id] = {
+    chatRooms[roomId].cursors[socket.id] = {
       id: socket.id,
       username,
       color,
@@ -45,12 +82,12 @@ io.on('connection', (socket) => {
     
     // Broadcast updated cursors to room
     io.to(roomId).emit('cursor-update', {
-      cursors: rooms[roomId].cursors
+      cursors: chatRooms[roomId].cursors
     });
     
     // Send chat history to the newly joined user
     socket.emit('chat-history', {
-      messages: rooms[roomId].messages
+      messages: chatRooms[roomId].messages
     });
     
     // Notify others that a new user has joined
@@ -66,13 +103,13 @@ io.on('connection', (socket) => {
     const { roomId, x, y } = data;
     
     // Update cursor position
-    if (rooms[roomId] && rooms[roomId].cursors[socket.id]) {
-      rooms[roomId].cursors[socket.id].x = x;
-      rooms[roomId].cursors[socket.id].y = y;
+    if (chatRooms[roomId] && chatRooms[roomId].cursors[socket.id]) {
+      chatRooms[roomId].cursors[socket.id].x = x;
+      chatRooms[roomId].cursors[socket.id].y = y;
       
       // Broadcast updated cursors to room
       io.to(roomId).emit('cursor-update', {
-        cursors: rooms[roomId].cursors
+        cursors: chatRooms[roomId].cursors
       });
     }
   });
@@ -81,7 +118,7 @@ io.on('connection', (socket) => {
   socket.on('send-message', (data) => {
     const { roomId, message, username } = data;
     
-    if (rooms[roomId]) {
+    if (chatRooms[roomId]) {
       // Create message object
       const messageObj = {
         id: Date.now().toString(),
@@ -92,15 +129,43 @@ io.on('connection', (socket) => {
       };
       
       // Store message in room history
-      rooms[roomId].messages.push(messageObj);
+      chatRooms[roomId].messages.push(messageObj);
       
       // Limit history to last 100 messages
-      if (rooms[roomId].messages.length > 100) {
-        rooms[roomId].messages.shift();
+      if (chatRooms[roomId].messages.length > 100) {
+        chatRooms[roomId].messages.shift();
       }
       
       // Broadcast message to all users in the room
       io.to(roomId).emit('new-message', messageObj);
+    }
+  });
+  
+  // Handle room creation
+  socket.on('create-room', async (roomData) => {
+    try {
+      // Broadcast to all clients that a new room was created
+      io.emit('room-created', { room: roomData });
+    } catch (error) {
+      console.error('Error creating room:', error);
+      socket.emit('room-error', { message: 'Failed to create room' });
+    }
+  });
+  
+  // Handle fetching rooms
+  socket.on('fetch-rooms', async () => {
+    try {
+      // Fetch rooms from MongoDB
+      const rooms = await Room.find({})
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .select('-password');
+      
+      // Send rooms to client
+      socket.emit('rooms-list', { rooms });
+    } catch (error) {
+      console.error('Error fetching rooms:', error);
+      socket.emit('room-error', { message: 'Failed to fetch rooms' });
     }
   });
   
@@ -109,16 +174,16 @@ io.on('connection', (socket) => {
     console.log('User disconnected:', socket.id);
     
     // Remove cursor from all rooms and notify others
-    Object.keys(rooms).forEach(roomId => {
-      if (rooms[roomId]?.cursors[socket.id]) {
-        const username = rooms[roomId].cursors[socket.id].username;
+    Object.keys(chatRooms).forEach(roomId => {
+      if (chatRooms[roomId]?.cursors[socket.id]) {
+        const username = chatRooms[roomId].cursors[socket.id].username;
         
         // Remove cursor
-        delete rooms[roomId].cursors[socket.id];
+        delete chatRooms[roomId].cursors[socket.id];
         
         // Broadcast updated cursors to room
         io.to(roomId).emit('cursor-update', {
-          cursors: rooms[roomId].cursors
+          cursors: chatRooms[roomId].cursors
         });
         
         // Notify others that user has left
@@ -132,8 +197,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start server
-const PORT = process.env.SOCKET_PORT || 3001;
-httpServer.listen(PORT, () => {
-  console.log(`Socket.io server running on port ${PORT}`);
+// Connect to MongoDB and start server
+connectToMongoDB().then(() => {
+  const PORT = process.env.SOCKET_PORT || 3001;
+  httpServer.listen(PORT, () => {
+    console.log(`Socket.io server running on port ${PORT}`);
+  });
 });

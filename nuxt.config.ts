@@ -18,5 +18,16 @@ export default defineNuxtConfig({
     experimental: {
       websocket: true
     }
+  },
+  runtimeConfig: {
+    // Server-side environment variables
+    jwtSecret: process.env.JWT_SECRET || 'your-fallback-secret-key-change-this',
+    mongodbUri: process.env.MONGODB_URI,
+    
+    // Public variables
+    public: {
+      socketUrl: process.env.SOCKET_URL || '',
+      socketPort: process.env.SOCKET_PORT || 3001
+    }
   }
 })
