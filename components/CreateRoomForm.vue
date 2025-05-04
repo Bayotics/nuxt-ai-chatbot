@@ -82,7 +82,7 @@
           
           <button
             type="submit"
-            class="px-6 py-2 bg-primary-600 text-gray-400 hover:bg-primary-700 rounded-md transition-colors"
+            class="px-6 py-2 bg-gray-600 text-gray-100 hover:bg-primary-700 rounded-md transition-colors cursor-pointer"
             :disabled="isSubmitting"
           >
             <span v-if="isSubmitting">Creating...</span>

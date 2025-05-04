@@ -14,7 +14,7 @@
     <!-- App-wide footer -->
     <footer v-if="showFooter" class="bg-white p-4 border-t">
       <div class="container mx-auto text-center text-gray-600">
-        &copy; {{ new Date().getFullYear() }} AI Chatbot
+        &copy; {{ new Date().getFullYear() }} AI Chatbot. Created by Abdullahi Sho
       </div>
     </footer>
   </div>

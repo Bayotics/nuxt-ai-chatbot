@@ -3,13 +3,13 @@
     <!-- Header -->
     <header class="bg-white shadow-sm p-4">
       <div class="container mx-auto flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-primary-600">AI Chatbot with Live Cursors</h1>
+        <h1 class="text-2xl font-bold text-primary-600">Created by Abdullahi Sho</h1>
         
         <div class="flex items-center space-x-2">
           <button 
             v-if="auth.isAuthenticated.value"
             @click="showCreateRoomModal = true" 
-            class="px-4 py-2 bg-primary-600 text-gray-400 rounded-md hover:bg-primary-700 transition-colors"
+            class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
           >
             Create Room
           </button>
@@ -31,6 +31,7 @@
           :socketInstance="socketInstance" 
           @select-room="selectRoom"
           @create-room="showCreateRoomModal = true"
+          @show-auth="handleShowAuth"
         />
       </div>
       
@@ -96,7 +97,7 @@
                     @click="message.showTranslation = true"
                     class="text-sm text-primary-600 mt-1 hover:underline"
                   >
-                    Translate
+                    Translate with AI
                   </button>
                   
                   <div v-if="message.showTranslation" class="mt-2">
@@ -145,12 +146,32 @@
     <div v-if="showAuthModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg p-6 max-w-md w-full">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold">Account</h2>
-          <button @click="showAuthModal = false" class="text-gray-500 hover:text-gray-700">
+          <h2 class="text-xl font-bold">
+            {{ pendingRoom ? 'Sign in to join room' : 'Account' }}
+          </h2>
+          <button @click="cancelAuth" class="text-gray-500 hover:text-gray-700">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+        </div>
+        
+        <!-- Show room info if trying to join a specific room -->
+        <div v-if="pendingRoom" class="mb-4 p-3 bg-gray-50 rounded-md">
+          <div class="flex items-center gap-3">
+            <div 
+              class="w-10 h-10 rounded-md flex items-center justify-center text-white"
+              :style="{ backgroundColor: pendingRoom.color || '#10b981' }"
+            >
+              {{ pendingRoom.name.charAt(0).toUpperCase() }}
+            </div>
+            <div>
+              <h3 class="font-medium">{{ pendingRoom.name }}</h3>
+              <p class="text-sm text-gray-500">
+                {{ pendingRoom.description || 'No description' }}
+              </p>
+            </div>
+          </div>
         </div>
         
         <AuthSignIn 
@@ -194,9 +215,6 @@ import { io } from 'socket.io-client';
 
 // Use auth composable
 const auth = useAuth();
-console.log(auth)
-console.log(auth.isAuthenticated)
-console.log(auth.isAuthenticated.value)
 
 const username = ref('User' + Math.floor(Math.random() * 1000));
 const roomId = ref('');
@@ -214,10 +232,14 @@ const isLoading = ref(true);
 const showAuthModal = ref(false);
 const showCreateRoomModal = ref(false);
 const selectedRoom = ref(null);
+const pendingRoom = ref(null); // Store room that user wants to join after auth
 
 // Initialize socket connection ref
 const socketUrl = process.env.NUXT_ENV_SOCKET_URL || 'http://localhost:3001';
 const socket = ref(null);
+
+// Initialize isAuthenticated ref to false
+const isAuthenticated = ref(false);
 
 // Set username from auth if available
 watch(() => auth.user.value, (newUser) => {
@@ -226,7 +248,25 @@ watch(() => auth.user.value, (newUser) => {
   }
 }, { immediate: true });
 
+// Watch for authentication state changes
+watch(() => auth.isAuthenticated.value, (isAuthenticatedValue) => {
+  isAuthenticated.value = isAuthenticatedValue;
+  // If user just authenticated and there's a pending room, join it
+  if (isAuthenticatedValue && pendingRoom.value) {
+    selectRoom(pendingRoom.value);
+    pendingRoom.value = null;
+  }
+});
+
 const selectRoom = (room) => {
+  // Check if user is authenticated
+  if (!isAuthenticated.value) {
+    // Store the room to join after authentication
+    pendingRoom.value = room;
+    showAuthModal.value = true;
+    return;
+  }
+  
   selectedRoom.value = room;
   roomId.value = room._id;
   inRoom.value = true;
@@ -239,6 +279,18 @@ const leaveRoom = () => {
   messages.value = [];
   systemNotifications.value = [];
   activeUsers.value = {};
+};
+
+// Handle showing auth modal when trying to join a room
+const handleShowAuth = (room) => {
+  pendingRoom.value = room;
+  showAuthModal.value = true;
+};
+
+// Cancel auth and clear pending room
+const cancelAuth = () => {
+  showAuthModal.value = false;
+  pendingRoom.value = null;
 };
 
 const handleSocketReady = (socket) => {
@@ -377,10 +429,22 @@ const handleSignedIn = () => {
   if (auth.user.value) {
     username.value = auth.user.value.firstName || auth.user.value.username || username.value;
   }
+  
+  // If there's a pending room, join it
+  if (pendingRoom.value) {
+    selectRoom(pendingRoom.value);
+    pendingRoom.value = null;
+  }
 };
 
 const handleSignedOut = () => {
   showAuthModal.value = false;
+  pendingRoom.value = null;
+  
+  // If in a room, leave it
+  if (inRoom.value) {
+    leaveRoom();
+  }
 };
 
 const handleRoomCreated = (room) => {

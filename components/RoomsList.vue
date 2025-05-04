@@ -3,14 +3,23 @@
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-bold">Chat Rooms</h2>
       
-      <!-- Create Room Button - Always visible when authenticated -->
+      <!-- Create Room Button - Only visible when authenticated -->
       <button 
-        v-if="auth.isAuthenticated"
+        v-if="auth.isAuthenticated.value"
         @click="$emit('create-room')" 
-        class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+        class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-primary-700 transition-colors cursor-pointer"
       >
         Create Room
       </button>
+      <!-- Sign in prompt for unauthenticated users -->
+      <!-- <button 
+        v-else
+        @click="$emit('show-auth')" 
+        class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
+      >
+        Sign in to create
+      </button> -->
+      <p v-else ></p>
     </div>
     
     <div v-if="isLoading" class="flex justify-center items-center py-8">
@@ -32,9 +41,9 @@
       
       <!-- Create Room Button when no rooms exist -->
       <button 
-        v-if="auth.isAuthenticated"
+        v-if="auth.isAuthenticated.value"
         @click="$emit('create-room')" 
-        class="px-6 py-2 bg-primary-600 text-gray-400 rounded-md hover:bg-primary-700 transition-colors"
+        class="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
       >
         Create New Room
       </button>
@@ -48,9 +57,20 @@
       <div 
         v-for="room in rooms" 
         :key="room._id" 
-        class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
-        @click="$emit('select-room', room)"
+        class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer relative"
+        @click="handleRoomClick(room)"
       >
+        <!-- Lock icon for unauthenticated users -->
+        <div 
+          v-if="!auth.isAuthenticated.value" 
+          class="absolute top-2 right-2 text-gray-400"
+          title="Sign in to join"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        
         <div class="flex items-center gap-3">
           <div 
             class="w-10 h-10 rounded-md flex items-center justify-center text-white"
@@ -76,6 +96,14 @@
         <div class="flex justify-between items-center mt-3 text-xs text-gray-500">
           <span>Created by {{ room.creatorName || 'Anonymous' }}</span>
           <span>{{ formatDate(room.createdAt) }}</span>
+        </div>
+        
+        <!-- Sign in prompt for unauthenticated users -->
+        <div 
+          v-if="!auth.isAuthenticated.value" 
+          class="mt-3 pt-3 border-t border-gray-100 text-center"
+        >
+          <span class="text-sm text-primary-600">Sign in to join this room</span>
         </div>
       </div>
     </div>
@@ -105,7 +133,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['select-room', 'create-room']);
+const emit = defineEmits(['select-room', 'create-room', 'show-auth']);
 
 const auth = useAuth();
 
@@ -117,6 +145,22 @@ const page = ref(1);
 const limit = ref(10);
 const hasMoreRooms = ref(false);
 const total = ref(0);
+
+// Listen for socket events
+const roomCreated = ref(false);
+const roomUpdated = ref(false);
+const roomDeleted = ref(false);
+
+// Handle room click - check authentication first
+const handleRoomClick = (room) => {
+  if (!auth.isAuthenticated.value) {
+    // Emit event to show auth modal
+    emit('show-auth', room);
+  } else {
+    // User is authenticated, proceed to select room
+    emit('select-room', room);
+  }
+};
 
 // Fetch rooms from API
 const fetchRooms = async (loadMore = false) => {
@@ -174,6 +218,7 @@ const setupSocketListeners = () => {
   props.socketInstance.on('room-created', (data) => {
     rooms.value.unshift(data.room);
     total.value++;
+    roomCreated.value = !roomCreated.value;
   });
   
   // Listen for room updated event
@@ -181,6 +226,7 @@ const setupSocketListeners = () => {
     const index = rooms.value.findIndex(room => room._id === data.room._id);
     if (index !== -1) {
       rooms.value[index] = data.room;
+      roomUpdated.value = !roomUpdated.value;
     }
   });
   
@@ -190,6 +236,7 @@ const setupSocketListeners = () => {
     if (index !== -1) {
       rooms.value.splice(index, 1);
       total.value--;
+      roomDeleted.value = !roomDeleted.value;
     }
   });
 };

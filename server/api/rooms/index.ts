@@ -6,7 +6,7 @@ import { getUserFromEvent } from '~/server/utils/auth';
 export default defineEventHandler(async (event) => {
   // Connect to database
   await connectToDatabase();
-  
+   
   // Handle different HTTP methods
   const method = event.node.req.method;
   

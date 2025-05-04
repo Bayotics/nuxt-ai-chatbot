@@ -125,7 +125,7 @@
             
             <button
               type="submit"
-              class="px-6 py-2 bg-primary-600 text-gray-400 hover:bg-primary-700 rounded-md transition-colors"
+              class="px-6 py-2 bg-primary-600 text-gray-400 hover:bg-primary-700 rounded-md transition-colors cursor-pointer"
               :disabled="localLoading"
             >
               <span v-if="localLoading">Creating...</span>
@@ -175,14 +175,14 @@
             <button
               type="button"
               @click="showRegister = true"
-              class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
+              class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors cursor-pointer"
             >
               Create Account
             </button>
             
             <button
               type="submit"
-              class="px-6 py-2 bg-primary-600 text-gray-400 hover:bg-primary-700 rounded-md transition-colors"
+              class="px-6 py-2 bg-gray-600 text-gray-100 hover:bg-primary-700 rounded-md transition-colors cursor-pointer"
               :disabled="localLoading"
             >
               <span v-if="localLoading">Signing In...</span>
@@ -202,8 +202,8 @@ import { useAuth } from '~/composables/useAuth';
 const emit = defineEmits(['signed-in', 'signed-out']);
 
 const auth = useAuth();
-console.log(auth)
-console.log(auth?.user.value.username)
+// console.log(auth)
+// console.log(auth?.user.value.username)
 const localLoading = ref(false);
 const showRegister = ref(false);
 
