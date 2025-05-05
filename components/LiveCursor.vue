@@ -54,7 +54,7 @@ const isConnected = ref(false);
 const initializeSocket = () => {
   try {
     // Connect to the standalone Socket.io server
-    socket.value = io('http://localhost:3001', {
+    socket.value = io('https://socket-server-rix7.onrender.com', {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       transports: ['websocket', 'polling']

@@ -199,7 +199,7 @@ io.on('connection', (socket) => {
 
 // Connect to MongoDB and start server
 connectToMongoDB().then(() => {
-  const PORT = process.env.SOCKET_PORT || 3001;
+  const PORT = process.env.SOCKET_PORT || 'https://socket-server-rix7.onrender.com';
   httpServer.listen(PORT, () => {
     console.log(`Socket.io server running on port ${PORT}`);
   });

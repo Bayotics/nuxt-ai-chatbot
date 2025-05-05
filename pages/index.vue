@@ -235,7 +235,7 @@ const selectedRoom = ref(null);
 const pendingRoom = ref(null); // Store room that user wants to join after auth
 
 // Initialize socket connection ref
-const socketUrl = process.env.NUXT_ENV_SOCKET_URL || 'http://localhost:3001';
+const socketUrl = process.env.NUXT_ENV_SOCKET_URL || 'https://socket-server-rix7.onrender.com';
 const socket = ref(null);
 
 // Initialize isAuthenticated ref to false

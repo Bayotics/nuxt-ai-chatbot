@@ -45,7 +45,7 @@ export default defineNuxtConfig({
     // Public variables
     public: {
       socketUrl: process.env.SOCKET_URL || '',
-      socketPort: process.env.SOCKET_PORT || 3001
+      socketPort: process.env.SOCKET_PORT || 'https://socket-server-rix7.onrender.com'
     }
   }
 })
