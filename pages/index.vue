@@ -52,7 +52,7 @@
             <div>
               <h2 class="text-lg font-semibold">Chat Room: {{ selectedRoom?.name || roomId }} 
                 <i class="text-xs text-gray-500">Socket server hosted live on render spins down with inactivity.
-                   Could take a while to come back up or manually trigger; <a class="text-blue-600 underline" target="_blank" href="https://socket-server-rix7.onrender.com/">here</a></i></h2>
+                   Could take a while to come back up or manually trigger <a class="text-blue-600 underline" target="_blank" href="https://socket-server-rix7.onrender.com/">here</a></i></h2>
               <div class="text-sm text-gray-500 mt-1">
                 <span>{{ Object.keys(activeUsers).length }} users online</span>
               </div>
